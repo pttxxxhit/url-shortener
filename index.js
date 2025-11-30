@@ -2,73 +2,81 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 const dns = require("dns");
 const app = express();
 
-// Basic Configuration
+// Config
 const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use("/public", express.static(process.cwd() + "/public"));
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json()); // <- permitir JSON en el body
+app.use(express.urlencoded({ extended: false })); // form data
+app.use(express.json()); // json bodies
 
 // Página principal
 app.get("/", (req, res) => {
     res.sendFile(process.cwd() + "/views/index.html");
 });
 
-// almacenamiento en memoria
-let urls = [];
+// Almacenamiento en memoria (mapa para búsquedas rápidas)
+const urlsById = {};
 let idCounter = 1;
 
 // POST /api/shorturl
 app.post("/api/shorturl", (req, res) => {
     const originalUrl = req.body.url;
+    console.log("POST /api/shorturl body:", req.body);
 
+    if (!originalUrl) {
+        return res.json({ error: "invalid url" });
+    }
+
+    let urlObj;
     try {
-        const urlObj = new URL(originalUrl);
-
-        // Verificar que sea http o https
-        if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
-            return res.json({ error: "invalid url" });
-        }
-
-        // validar con dns.lookup (comprobar también address)
-        dns.lookup(urlObj.hostname, (err, address) => {
-            if (err || !address) {
-                return res.json({ error: "invalid url" });
-            }
-
-            const shortUrl = idCounter++;
-            // Guardar con las claves que espera la prueba
-            urls.push({ short_url: shortUrl, original_url: originalUrl });
-
-            res.json({
-                original_url: originalUrl,
-                short_url: shortUrl
-            });
-        });
+        urlObj = new URL(originalUrl);
     } catch (e) {
         return res.json({ error: "invalid url" });
     }
+
+    if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
+        return res.json({ error: "invalid url" });
+    }
+
+    // DNS lookup: comprobar que el hostname resuelve (usa family 4 para evitar problemas v6)
+    dns.lookup(urlObj.hostname, { family: 4 }, (err, address) => {
+        if (err || !address) {
+            console.log("DNS lookup failed for", urlObj.hostname, err);
+            return res.json({ error: "invalid url" });
+        }
+
+        const shortUrl = idCounter++;
+        urlsById[shortUrl] = originalUrl;
+
+        console.log("Created short url:", shortUrl, "->", originalUrl);
+
+        return res.json({
+            original_url: originalUrl,
+            short_url: shortUrl
+        });
+    });
 });
 
 // GET /api/shorturl/:short_url
 app.get("/api/shorturl/:short_url", (req, res) => {
     const shortUrl = parseInt(req.params.short_url);
-    const entry = urls.find(u => u.short_url === shortUrl);
+    console.log("GET /api/shorturl/", shortUrl);
 
-    if (!entry) {
-        return res.json({ error: "No short URL found" });
+    const original = urlsById[shortUrl];
+    if (!original) {
+        return res.status(404).json({ error: "No short URL found" });
     }
 
-    res.redirect(entry.original_url);
+    return res.redirect(original);
 });
 
-// puerto
+// Start
 const listener = app.listen(port, () => {
     console.log("Listening on port " + listener.address().port);
 });
+
