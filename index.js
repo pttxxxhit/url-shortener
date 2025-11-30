@@ -1,4 +1,4 @@
-
+// javascript
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -13,6 +13,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use("/public", express.static(process.cwd() + "/public"));
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json()); // <- permitir JSON en el body
 
 // Página principal
 app.get("/", (req, res) => {
@@ -35,14 +36,15 @@ app.post("/api/shorturl", (req, res) => {
             return res.json({ error: "invalid url" });
         }
 
-        // validar con dns.lookup
-        dns.lookup(urlObj.hostname, (err) => {
-            if (err) {
+        // validar con dns.lookup (comprobar también address)
+        dns.lookup(urlObj.hostname, (err, address) => {
+            if (err || !address) {
                 return res.json({ error: "invalid url" });
             }
 
             const shortUrl = idCounter++;
-            urls.push({ shortUrl, originalUrl });
+            // Guardar con las claves que espera la prueba
+            urls.push({ short_url: shortUrl, original_url: originalUrl });
 
             res.json({
                 original_url: originalUrl,
@@ -57,13 +59,13 @@ app.post("/api/shorturl", (req, res) => {
 // GET /api/shorturl/:short_url
 app.get("/api/shorturl/:short_url", (req, res) => {
     const shortUrl = parseInt(req.params.short_url);
-    const entry = urls.find(u => u.shortUrl === shortUrl);
+    const entry = urls.find(u => u.short_url === shortUrl);
 
     if (!entry) {
         return res.json({ error: "No short URL found" });
     }
 
-    res.redirect(entry.originalUrl);
+    res.redirect(entry.original_url);
 });
 
 // puerto
