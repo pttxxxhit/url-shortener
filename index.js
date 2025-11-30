@@ -3,7 +3,15 @@ const bodyParser = require("body-parser");
 const dns = require("dns");
 const app = express();
 
+// Servir archivos estáticos
+app.use("/public", express.static(process.cwd() + "/public"));
+
 app.use(bodyParser.urlencoded({ extended: false }));
+
+// Página principal
+app.get("/", (req, res) => {
+    res.sendFile(process.cwd() + "/views/index.html");
+});
 
 // almacenamiento en memoria
 let urls = [];
