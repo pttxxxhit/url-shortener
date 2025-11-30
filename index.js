@@ -1,11 +1,17 @@
+
+require("dotenv").config();
 const express = require("express");
+const cors = require("cors");
 const bodyParser = require("body-parser");
 const dns = require("dns");
 const app = express();
 
-// Servir archivos estáticos
-app.use("/public", express.static(process.cwd() + "/public"));
+// Basic Configuration
+const port = process.env.PORT || 3000;
 
+// Middleware
+app.use(cors());
+app.use("/public", express.static(process.cwd() + "/public"));
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // Página principal
@@ -23,6 +29,11 @@ app.post("/api/shorturl", (req, res) => {
 
     try {
         const urlObj = new URL(originalUrl);
+
+        // Verificar que sea http o https
+        if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
+            return res.json({ error: "invalid url" });
+        }
 
         // validar con dns.lookup
         dns.lookup(urlObj.hostname, (err) => {
@@ -56,6 +67,6 @@ app.get("/api/shorturl/:short_url", (req, res) => {
 });
 
 // puerto
-const listener = app.listen(process.env.PORT || 3000, () => {
+const listener = app.listen(port, () => {
     console.log("Listening on port " + listener.address().port);
 });
