@@ -1,24 +1,53 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const bodyParser = require("body-parser");
+const dns = require("dns");
 const app = express();
 
-// Basic Configuration
-const port = process.env.PORT || 3000;
+app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use(cors());
+// almacenamiento en memoria
+let urls = [];
+let idCounter = 1;
 
-app.use('/public', express.static(`${process.cwd()}/public`));
+// POST /api/shorturl
+app.post("/api/shorturl", (req, res) => {
+    const originalUrl = req.body.url;
 
-app.get('/', function(req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
+    try {
+        const urlObj = new URL(originalUrl);
+
+        // validar con dns.lookup
+        dns.lookup(urlObj.hostname, (err) => {
+            if (err) {
+                return res.json({ error: "invalid url" });
+            }
+
+            const shortUrl = idCounter++;
+            urls.push({ shortUrl, originalUrl });
+
+            res.json({
+                original_url: originalUrl,
+                short_url: shortUrl
+            });
+        });
+    } catch (e) {
+        return res.json({ error: "invalid url" });
+    }
 });
 
-// Your first API endpoint
-app.get('/api/hello', function(req, res) {
-  res.json({ greeting: 'hello API' });
+// GET /api/shorturl/:short_url
+app.get("/api/shorturl/:short_url", (req, res) => {
+    const shortUrl = parseInt(req.params.short_url);
+    const entry = urls.find(u => u.shortUrl === shortUrl);
+
+    if (!entry) {
+        return res.json({ error: "No short URL found" });
+    }
+
+    res.redirect(entry.originalUrl);
 });
 
-app.listen(port, function() {
-  console.log(`Listening on port ${port}`);
+// puerto
+const listener = app.listen(process.env.PORT || 3000, () => {
+    console.log("Listening on port " + listener.address().port);
 });
