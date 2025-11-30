@@ -11,15 +11,15 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use("/public", express.static(process.cwd() + "/public"));
-app.use(express.urlencoded({ extended: false })); // form data
-app.use(express.json()); // json bodies
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 
 // Página principal
 app.get("/", (req, res) => {
     res.sendFile(process.cwd() + "/views/index.html");
 });
 
-// Almacenamiento en memoria (mapa para búsquedas rápidas)
+// Almacenamiento en memoria
 const urlsById = {};
 let idCounter = 1;
 
@@ -43,8 +43,8 @@ app.post("/api/shorturl", (req, res) => {
         return res.json({ error: "invalid url" });
     }
 
-    // DNS lookup: comprobar que el hostname resuelve (usa family 4 para evitar problemas v6)
-    dns.lookup(urlObj.hostname, { family: 4 }, (err, address) => {
+    // DNS lookup sin forzar family para aceptar IPv4/IPv6
+    dns.lookup(urlObj.hostname, (err, address) => {
         if (err || !address) {
             console.log("DNS lookup failed for", urlObj.hostname, err);
             return res.json({ error: "invalid url" });
@@ -80,3 +80,5 @@ const listener = app.listen(port, () => {
     console.log("Listening on port " + listener.address().port);
 });
 
+// Export app for automated tests
+module.exports = app;
