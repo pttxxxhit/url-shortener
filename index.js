@@ -24,6 +24,8 @@ const urlsById = {};
 let idCounter = 1;
 
 // POST /api/shorturl
+// POST /api/shorturl
+
 app.post("/api/shorturl", (req, res) => {
     const originalUrl = req.body.url;
     console.log("POST /api/shorturl body:", req.body);
@@ -43,8 +45,24 @@ app.post("/api/shorturl", (req, res) => {
         return res.json({ error: "invalid url" });
     }
 
-    // DNS lookup sin forzar family para aceptar IPv4/IPv6
+    // DNS lookup con timeout de 3 segundos
+    const timeoutMs = 3000;
+    let responded = false;
+
+    const timeout = setTimeout(() => {
+        if (!responded) {
+            responded = true;
+            console.log("DNS lookup timeout for", urlObj.hostname);
+            return res.json({ error: "invalid url" });
+        }
+    }, timeoutMs);
+
     dns.lookup(urlObj.hostname, (err, address) => {
+        clearTimeout(timeout);
+
+        if (responded) return; // Ya respondimos por timeout
+        responded = true;
+
         if (err || !address) {
             console.log("DNS lookup failed for", urlObj.hostname, err);
             return res.json({ error: "invalid url" });
@@ -61,6 +79,7 @@ app.post("/api/shorturl", (req, res) => {
         });
     });
 });
+
 
 // GET /api/shorturl/:short_url
 app.get("/api/shorturl/:short_url", (req, res) => {
